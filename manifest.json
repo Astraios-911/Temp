@@ -1,0 +1,11 @@
+{
+  "Name": "More TV Channels",
+  "Author": "Astraios",
+  "Version": "1.0.0",
+  "Description": "Adds more TV channels",
+  "UniqueID": "Astraios.MoreTVChannels",
+  "EntryDll": "MoreTVChannels.dll",
+  "MinimumApiVersion": "3.0.0",
+  "UpdateKeys": [],
+  "Dependencies": []
+}
