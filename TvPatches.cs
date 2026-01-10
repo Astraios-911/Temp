@@ -24,11 +24,11 @@ namespace MoreTVChannels
             int insertPos = choices.Count - 1; // Before "Leave" option
 
             // Add custom channels that aren't hidden
-            foreach (var channel in AssetHandler<CustomChannelData>.Data.Values.Where(c => !c.HideFromMenu))
+            foreach (var channel in ModEntry.CustomChannels.Data.Values.Where(c => !c.HideFromMenu))
                 choices.Insert(insertPos++, new Response(channel.Name, channel.Displayname));
 
             // Handle edited channels
-            foreach (var (key, edit) in AssetHandler<EditChannelData>.Data)
+            foreach (var (key, edit) in ModEntry.EditChannels.Data)
             {
                 if (edit.HideFromMenu == true) continue;
 

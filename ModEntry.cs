@@ -12,6 +12,10 @@ namespace MoreTVChannels
         private Api? _api;
         public static ModEntry? Instance { get; private set; }
         public static IMonitor ModMonitor { get; private set; }
+        public static IFurnitureFrameworkAPI? FurnitureFrameworkAPI;
+        public static AssetHandler<CustomChannelData> CustomChannels { get; private set; }
+        public static AssetHandler<OverlayData> Overlays { get; private set; }
+        public static AssetHandler<EditChannelData> EditChannels { get; private set; }
 
         public override void Entry(IModHelper helper)
         {
@@ -35,16 +39,24 @@ namespace MoreTVChannels
                 postfix: new HarmonyMethod(typeof(TvPatches), nameof(TvPatches.TurnOffTVPostfix))
             );
 
-            // Initialize asset handlers
-            AssetHandler<CustomChannelData>.Init(Monitor, ModManifest.UniqueID, "CustomChannels");
-            AssetHandler<OverlayData>.Init(Monitor, ModManifest.UniqueID, "OverlaySprite");
-            AssetHandler<EditChannelData>.Init(Monitor, ModManifest.UniqueID, "EditChannels");
+            // Load Furniture Framework API if available
+            if (helper.ModRegistry.IsLoaded("leroymilo.FurnitureFramework"))
+            {
+                FurnitureFrameworkAPI = helper.ModRegistry.GetApi<IFurnitureFrameworkAPI>("leroymilo.FurnitureFramework");
+                if (FurnitureFrameworkAPI != null)
+                    Monitor.Log("Furniture Framework API loaded successfully!", LogLevel.Info);
+            }
+
+            // Initialize asset handlers as instances
+            CustomChannels = new AssetHandler<CustomChannelData>(Monitor, ModManifest.UniqueID, "CustomChannels");
+            Overlays = new AssetHandler<OverlayData>(Monitor, ModManifest.UniqueID, "OverlaySprite");
+            EditChannels = new AssetHandler<EditChannelData>(Monitor, ModManifest.UniqueID, "EditChannels");
 
             // Register events
             helper.Events.Content.AssetRequested += OnAssetRequested;
-            helper.Events.Content.AssetsInvalidated += AssetHandler<CustomChannelData>.OnAssetsInvalidated;
-            helper.Events.Content.AssetsInvalidated += AssetHandler<OverlayData>.OnAssetsInvalidated;
-            helper.Events.Content.AssetsInvalidated += AssetHandler<EditChannelData>.OnAssetsInvalidated;
+            helper.Events.Content.AssetsInvalidated += CustomChannels.OnAssetsInvalidated;
+            helper.Events.Content.AssetsInvalidated += Overlays.OnAssetsInvalidated;
+            helper.Events.Content.AssetsInvalidated += EditChannels.OnAssetsInvalidated;
         }
 
         public override object GetApi() => _api!;
@@ -67,14 +79,14 @@ namespace MoreTVChannels
     /// <summary>
     /// Generic asset handler to reduce code duplication.
     /// </summary>
-    public static class AssetHandler<T> where T : class
+    public class AssetHandler<T> where T : class
     {
-        private static Dictionary<string, T>? _cache;
-        private static IMonitor? _monitor;
-        private static string? _assetName;
-        private static string? _assetType;
+        private Dictionary<string, T>? _cache;
+        private readonly IMonitor _monitor;
+        private readonly string _assetName;
+        private readonly string _assetType;
 
-        public static void Init(IMonitor monitor, string modUniqueId, string assetType)
+        public AssetHandler(IMonitor monitor, string modUniqueId, string assetType)
         {
             _monitor = monitor;
             _assetType = assetType;
@@ -82,7 +94,7 @@ namespace MoreTVChannels
             _monitor?.Log($"[{assetType}] Initialized", LogLevel.Trace);
         }
 
-        public static Dictionary<string, T> Data
+        public Dictionary<string, T> Data
         {
             get
             {
@@ -110,7 +122,7 @@ namespace MoreTVChannels
             }
         }
 
-        public static void OnAssetsInvalidated(object? sender, AssetsInvalidatedEventArgs e)
+        public void OnAssetsInvalidated(object? sender, AssetsInvalidatedEventArgs e)
         {
             foreach (var name in e.NamesWithoutLocale)
             {

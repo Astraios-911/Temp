@@ -22,7 +22,6 @@ namespace MoreTVChannels
         public static void SelectCustomChannel(TV tv, Farmer who, string answer)
         {
             ModEntry.ModMonitor?.Log($"[SelectCustomChannel] Called with answer: {answer}", LogLevel.Debug);
-
             if (string.IsNullOrWhiteSpace(answer) || answer == "(Leave)")
             {
                 ModEntry.ModMonitor?.Log($"[SelectCustomChannel] Empty answer or Leave, exiting", LogLevel.Debug);
@@ -30,7 +29,7 @@ namespace MoreTVChannels
             }
 
             // Try to get custom channel first
-            var channel = AssetHandler<CustomChannelData>.Data.GetValueOrDefault(answer);
+            var channel = ModEntry.CustomChannels.Data.GetValueOrDefault(answer);
 
             // If custom channel found, check for BQuestions
             if (channel != null)
@@ -41,7 +40,7 @@ namespace MoreTVChannels
                 if (channel.BQuestions != null && channel.BQuestions.Answers.Count > 0)
                 {
                     ModEntry.ModMonitor?.Log($"[SelectCustomChannel] Channel has BQuestions, showing question dialog", LogLevel.Debug);
-                    ShowBQuestions(tv, channel);
+                    QuestionsManager.ShowBQuestions(tv, channel);
                 }
                 else
                 {
@@ -53,44 +52,6 @@ namespace MoreTVChannels
             {
                 ModEntry.ModMonitor?.Log($"[SelectCustomChannel] No custom channel found for: {answer}", LogLevel.Debug);
             }
-        }
-
-        /// <summary>
-        /// Shows the BQuestions dialog and (hopefully) PLAYS the channel after any answer >:(
-        /// </summary>
-        private static void ShowBQuestions(TV tv, CustomChannelData channel)
-        {
-            ModEntry.ModMonitor?.Log($"[ShowBQuestions] Starting for channel: {channel.Name}", LogLevel.Debug);
-            ModEntry.ModMonitor?.Log($"[ShowBQuestions] Question: {channel.BQuestions.Question}", LogLevel.Debug);
-            ModEntry.ModMonitor?.Log($"[ShowBQuestions] Answer count: {channel.BQuestions.Answers.Count}", LogLevel.Debug);
-
-            var responses = channel.BQuestions.Answers
-                .Select((ans, idx) => new Response($"bq_{idx}", ans))
-                .ToArray();
-
-            ModEntry.ModMonitor?.Log($"[ShowBQuestions] Created {responses.Length} response options", LogLevel.Debug);
-
-            // Store the channel and TV reference for the callback
-            var capturedChannel = channel;
-            var capturedTV = tv;
-
-            // Create the question dialog
-            Game1.currentLocation.createQuestionDialogue(
-                channel.BQuestions.Question,
-                responses,
-                (who, whichAnswer) =>
-                {
-                    ModEntry.ModMonitor?.Log($"[ShowBQuestions] BQuestion answered: {whichAnswer}", LogLevel.Debug);
-                    ModEntry.ModMonitor?.Log($"[ShowBQuestions] Now playing channel: {capturedChannel.Name}", LogLevel.Debug);
-
-                    // Play the channel regardless of answer
-                    PlayChannel(capturedTV, capturedChannel);
-
-                    ModEntry.ModMonitor?.Log($"[ShowBQuestions] PlayChannel call completed", LogLevel.Debug);
-                }
-            );
-
-            ModEntry.ModMonitor?.Log($"[ShowBQuestions] Question dialog created", LogLevel.Debug);
         }
 
         /// <summary>
@@ -107,7 +68,7 @@ namespace MoreTVChannels
                 Displayname = editData.Displayname ?? baseChannel.Displayname,
                 Dialogues = editData.Dialogues ?? baseChannel.Dialogues,
                 Texture = editData.Texture ?? baseChannel.Texture,
-                SpriteIndex = editData.SpriteIndex ?? baseChannel.SpriteIndex,
+                SpriteRegion = editData.SpriteRegion ?? baseChannel.SpriteRegion,
                 AnimationInterval = editData.AnimationInterval ?? baseChannel.AnimationInterval,
                 AnimationLength = editData.AnimationLength ?? baseChannel.AnimationLength,
                 Flicker = editData.Flicker ?? baseChannel.Flicker,
@@ -116,11 +77,13 @@ namespace MoreTVChannels
                 Color = editData.Color ?? baseChannel.Color,
                 Scale = editData.Scale ?? baseChannel.Scale,
                 ScaleChange = editData.ScaleChange ?? baseChannel.ScaleChange,
+                LayerDepth = editData.LayerDepth ?? baseChannel.LayerDepth,
                 HideFromMenu = editData.HideFromMenu ?? baseChannel.HideFromMenu,
                 NextChannel = editData.NextChannel ?? baseChannel.NextChannel,
                 Actions = editData.Actions ?? baseChannel.Actions,
                 Overlays = editData.Overlays ?? baseChannel.Overlays,
-                BQuestions = editData.BQuestions ?? baseChannel.BQuestions
+                BQuestions = editData.BQuestions ?? baseChannel.BQuestions,
+                EQuestions = editData.EQuestions ?? baseChannel.EQuestions
             };
 
             ModEntry.ModMonitor?.Log($"[PlayChannel] Channel data prepared", LogLevel.Debug);
@@ -135,12 +98,25 @@ namespace MoreTVChannels
             ModEntry.ModMonitor?.Log($"[PlayChannel] TV state setup complete", LogLevel.Debug);
 
             // Create and set screen sprite
+            // Calculate base depth - use FF's depth if available, otherwise vanilla
+            float baseDepth;
+            if (ModEntry.FurnitureFrameworkAPI?.TryGetScreenDepth(tv, out float? ffDepth, overlay: false) == true && ffDepth.HasValue)
+            {
+                baseDepth = ffDepth.Value;
+                ModEntry.ModMonitor?.Log($"[PlayChannel] Using FF depth: {baseDepth}", LogLevel.Debug);
+            }
+            else
+            {
+                baseDepth = (float)(tv.boundingBox.Bottom - 1) / 10000f;
+                ModEntry.ModMonitor?.Log($"[PlayChannel] Using vanilla depth: {baseDepth}", LogLevel.Debug);
+            }
+
             var sprite = new TemporaryAnimatedSprite(
                 textureName: null,
-                new Rectangle(channel.SpriteIndex.X, channel.SpriteIndex.Y, 42, 28),
+                channel.SpriteRegion,
                 channel.AnimationInterval, channel.AnimationLength, 999999,
                 tv.getScreenPosition(), channel.Flicker, channel.Flipped,
-                (float)(tv.boundingBox.Bottom - 1) / 10000f + 1E-05f,
+                baseDepth + channel.LayerDepth * 1E-05f,
                 channel.AlphaFade, channel.Color,
                 channel.Scale * tv.getScreenSizeModifier(),
                 channel.ScaleChange, 0f, 0f);
@@ -179,20 +155,25 @@ namespace MoreTVChannels
             }
 
             // Setup after-dialogue behavior
-            if (!string.IsNullOrEmpty(channel.NextChannel))
+            Game1.afterDialogues = () =>
             {
-                var next = channel.NextChannel; // Capture for closure
-                ModEntry.ModMonitor?.Log($"[PlayChannel] Next channel configured: {next}", LogLevel.Debug);
+                ModEntry.ModMonitor?.Log($"[PlayChannel] After dialogues - running actions", LogLevel.Debug);
+                Actions.RunChannelActions(channel);
+                OverlayManager.ClearOverlays();
 
-                Game1.afterDialogues = () =>
+                // Check for EQuestions
+                if (channel.EQuestions != null && channel.EQuestions.Answers.Count > 0)
                 {
-                    ModEntry.ModMonitor?.Log($"[PlayChannel] After dialogues - running actions and chaining to: {next}", LogLevel.Debug);
-                    Actions.RunChannelActions(channel);
-                    OverlayManager.ClearOverlays();
+                    ModEntry.ModMonitor?.Log($"[PlayChannel] Channel has EQuestions, showing them", LogLevel.Debug);
+                    QuestionsManager.ShowEQuestions(tv, channel, channel.NextChannel);
+                }
+                else if (!string.IsNullOrEmpty(channel.NextChannel))
+                {
+                    var next = channel.NextChannel;
+                    ModEntry.ModMonitor?.Log($"[PlayChannel] No EQuestions, chaining to: {next}", LogLevel.Debug);
 
                     // Chain to next channel
-                    var nextChannel = AssetHandler<CustomChannelData>.Data.GetValueOrDefault(next);
-
+                    var nextChannel = ModEntry.CustomChannels.Data.GetValueOrDefault(next);
                     if (nextChannel != null)
                     {
                         ModEntry.ModMonitor?.Log($"[PlayChannel] Found next channel, playing it", LogLevel.Debug);
@@ -203,20 +184,13 @@ namespace MoreTVChannels
                         ModEntry.ModMonitor?.Log($"[PlayChannel] Next channel not found, turning off TV", LogLevel.Debug);
                         tv.turnOffTV();
                     }
-                };
-            }
-            else
-            {
-                ModEntry.ModMonitor?.Log($"[PlayChannel] No next channel, will turn off TV after dialogues", LogLevel.Debug);
-
-                Game1.afterDialogues = () =>
+                }
+                else
                 {
-                    ModEntry.ModMonitor?.Log($"[PlayChannel] After dialogues - running actions and turning off TV", LogLevel.Debug);
-                    Actions.RunChannelActions(channel);
-                    OverlayManager.ClearOverlays();
+                    ModEntry.ModMonitor?.Log($"[PlayChannel] No next channel or EQuestions, turning off TV", LogLevel.Debug);
                     tv.turnOffTV();
-                };
-            }
+                }
+            };
 
             ModEntry.ModMonitor?.Log($"[PlayChannel] Channel setup complete", LogLevel.Debug);
         }

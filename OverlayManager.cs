@@ -19,7 +19,7 @@ namespace MoreTVChannels
 
             foreach (var key in overlayKeys.Where(k => !string.IsNullOrEmpty(k)))
             {
-                if (AssetHandler<OverlayData>.Data.TryGetValue(key, out var overlay))
+                if (ModEntry.Overlays.Data.TryGetValue(key, out var overlay))
                     CreateOverlay(overlay, screenPosition, screenSizeModifier, tv);
             }
         }
@@ -35,6 +35,19 @@ namespace MoreTVChannels
                 return;
             }
 
+            // Calculate base depth for overlay - use FF's overlay depth if available
+            float baseDepth;
+            if (ModEntry.FurnitureFrameworkAPI?.TryGetScreenDepth(tv, out float? ffDepth, overlay: true) == true && ffDepth.HasValue)
+            {
+                baseDepth = ffDepth.Value;
+                ModEntry.ModMonitor?.Log($"[CreateOverlay] Using FF overlay depth: {baseDepth}", LogLevel.Debug);
+            }
+            else
+            {
+                baseDepth = (float)(tv.boundingBox.Bottom - 1) / 10000f + 1E-05f;  // Vanilla + base overlay offset
+                ModEntry.ModMonitor?.Log($"[CreateOverlay] Using vanilla overlay depth: {baseDepth}", LogLevel.Debug);
+            }
+
             var sprite = new TemporaryAnimatedSprite(
                 textureName: null,
                 overlay.SpriteRegion,
@@ -44,7 +57,7 @@ namespace MoreTVChannels
                 screenPosition + overlay.Position * screenSizeModifier,
                 overlay.Flicker,
                 overlay.Flipped,
-                (float)(tv.boundingBox.Bottom - 1) / 10000f + (1f + overlay.LayerDepth) * 1E-05f,
+                baseDepth + overlay.LayerDepth * 1E-05f,
                 overlay.AlphaFade,
                 overlay.Color,
                 overlay.Scale * screenSizeModifier,

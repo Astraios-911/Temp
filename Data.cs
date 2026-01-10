@@ -11,7 +11,7 @@ namespace MoreTVChannels
         public string Displayname { get; set; } = "";
         public List<string> Dialogues { get; set; } = new();
         public string? Texture { get; set; }
-        public Point SpriteIndex { get; set; } = new Point(0, 0);
+        public Rectangle SpriteRegion { get; set; } = new Rectangle(0, 0, 42, 28);
         public float AnimationInterval { get; set; } = 150f;
         public int AnimationLength { get; set; } = 2;
         public bool Flicker { get; set; } = false;
@@ -20,20 +20,39 @@ namespace MoreTVChannels
         public Color Color { get; set; } = Color.White;
         public float Scale { get; set; } = 1f;
         public float ScaleChange { get; set; } = 0f;
+        public float LayerDepth { get; set; } = 1f;
         public bool HideFromMenu { get; set; } = false;
         public string? NextChannel { get; set; } = null;
         public List<string>? Actions { get; set; }
         public List<string>? Overlays { get; set; } = null;
-        public BQuestionsData? BQuestions { get; set; } = null;
+        public QuestionsData? BQuestions { get; set; } = null;
+        public QuestionsData? EQuestions { get; set; } = null;
     }
 
     /// <summary>
-    /// Represents questions to ask before a channel plays.
+    /// Represents an edit/override for a TV channel.
     /// </summary>
-    public class BQuestionsData
+    public class EditChannelData
     {
-        public string Question { get; set; } = "";
-        public List<string> Answers { get; set; } = new();
+        public string? Displayname { get; set; } = null;
+        public List<string>? Dialogues { get; set; } = null;
+        public string? Texture { get; set; } = null;
+        public Rectangle? SpriteRegion { get; set; } = null;
+        public float? AnimationInterval { get; set; } = null;
+        public int? AnimationLength { get; set; } = null;
+        public bool? Flicker { get; set; } = null;
+        public bool? Flipped { get; set; } = null;
+        public float? AlphaFade { get; set; } = null;
+        public Color? Color { get; set; } = null;
+        public float? Scale { get; set; } = null;
+        public float? ScaleChange { get; set; } = null;
+        public float? LayerDepth { get; set; } = null;
+        public string? NextChannel { get; set; } = null;
+        public List<string>? Actions { get; set; } = null;
+        public List<string>? Overlays { get; set; } = null;
+        public bool? HideFromMenu { get; set; } = null;
+        public QuestionsData? BQuestions { get; set; } = null;
+        public QuestionsData? EQuestions { get; set; } = null;
     }
 
     /// <summary>
@@ -55,30 +74,20 @@ namespace MoreTVChannels
         public float Rotation { get; set; } = 0f;
         public float RotationChange { get; set; } = 0f;
         public Vector2 Position { get; set; } = Vector2.Zero;
-        public float LayerDepth { get; set; } = 1f;
+        public float LayerDepth { get; set; } = 2f;
     }
 
     /// <summary>
-    /// Represents an edit/override for a TV channel.
+    /// Represents questions to ask before or after a channel plays.
     /// </summary>
-    public class EditChannelData
+    public class QuestionsData
     {
-        public string? Displayname { get; set; } = null;
-        public List<string>? Dialogues { get; set; } = null;
-        public string? Texture { get; set; } = null;
-        public Point? SpriteIndex { get; set; } = null;
-        public float? AnimationInterval { get; set; } = null;
-        public int? AnimationLength { get; set; } = null;
-        public bool? Flicker { get; set; } = null;
-        public bool? Flipped { get; set; } = null;
-        public float? AlphaFade { get; set; } = null;
-        public Color? Color { get; set; } = null;
-        public float? Scale { get; set; } = null;
-        public float? ScaleChange { get; set; } = null;
-        public string? NextChannel { get; set; } = null;
-        public List<string>? Actions { get; set; } = null;
-        public List<string>? Overlays { get; set; } = null;
-        public bool? HideFromMenu { get; set; } = null;
-        public BQuestionsData? BQuestions { get; set; } = null;
+        public string Question { get; set; } = "";
+        public List<AnswerData> Answers { get; set; } = new();
+        public class AnswerData
+        {
+            public string Text { get; set; } = "";
+            public List<string>? Actions { get; set; } = null;
+        }
     }
 }

@@ -45,12 +45,12 @@ namespace MoreTVChannels
         }
 
         public void RegisterCustomChannel(CustomChannelData channel)
-            => AssetHandler<CustomChannelData>.Data[channel.Name] = channel;
+            => ModEntry.CustomChannels.Data[channel.Name] = channel;
 
         public void EditChannel(string name, EditChannelData edit)
-            => AssetHandler<EditChannelData>.Data[name] = edit;
+            => ModEntry.EditChannels.Data[name] = edit;
 
         public void RegisterOverlay(OverlayData overlay)
-            => AssetHandler<OverlayData>.Data[overlay.Name] = overlay;
+            => ModEntry.Overlays.Data[overlay.Name] = overlay;
     }
 }
